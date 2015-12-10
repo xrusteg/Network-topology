@@ -3,91 +3,92 @@ use strict;
 use Net::SNMP qw(snmp_dispatcher oid_lex_sort);
 use Data::Dumper qw(Dumper);
 use GraphViz;
+use List::MoreUtils qw/uniq/;
 
-my $host = "192.168.11.13";
-my $comm = "public";
-my $oid = ".1.3.6.1.2.1.17.7.1.2.2.1.2";
-#print "";
-
-my ($ses, $err) = Net::SNMP->session(
-	-hostname	=>	$host,
-	-version	=>	"2",
-	-community	=>	"public"
-);
-my $res = $ses->get_table(".1.3.6.1.2.1.17.7.1.2.2.1.2");
-
-my %switchs #задать ip, извлечь mac как ключ
-#
+my @hosts = qw (192.168.11.13 192.168.11.16);
+my $href;
+my %res;
 my @mac;
-my %hex;
-my $c;
-
-#foreach my $ips (keys %switchs) {хэш с мак:порт, для каждого порта убрать повторяющиеся кроме порта с маком другого свича (можно извлечь ипы)
-#создать узел текущего свича с его мак, создавать из хэша узлы с ребрами портами 
-
-#print Dumper \%$res;
-foreach (keys(%{$res})) {
-	#print "$_ -> $res->{$_}\n";
-	$_ =~ /(.1.3.6.1.2.1.17.7.1.2.2.1.2.1.)(.*)/;
-	@mac = split(/\./, $2);
-	$c = 0;
-	foreach my $i (@mac) {
-		$mac[$c] = sprintf ("%x", $i);# "$i\n";
-		$c++;
-	}
-	$hex{join("-",@mac)} = $res->{$_};
-}
-foreach my $hex_mac (keys%hex) {
-#	print "$hex_mac => $hex{$hex_mac}\n";
-}
-$ses->close;
-
-$host = "192.168.11.16";
-($ses, $err) = Net::SNMP->session(
-	-hostname	=>	$host,
-	-version	=>	"2",
-	-community	=>	"public"
-);
-$res = $ses->get_table(".1.3.6.1.2.1.17.7.1.2.2.1.2");
-#print $err;
-#print Dumper \%$res;
-
-my %hex1;
-foreach (keys(%{$res})) {
-	#print "$_ -> $res->{$_}\n";
-	$_ =~ /(.1.3.6.1.2.1.17.7.1.2.2.1.2.1.)(.*)/;
-	@mac = split(/\./, $2);
-	$c = 0;
-	foreach my $i (@mac) {
-		$mac[$c] = sprintf ("%x", $i);# "$i\n";
-		$c++;
-	}
-	$hex1{join("-",@mac)} = $res->{$_};
-}
-
-#print Dumper \%$hex1;
-foreach my $hex_mac (keys %hex1) {
-	#print "$hex_mac -> $hex1{$hex_mac}\n";
-}
-#print "=-=================\n";
-foreach my $hex_mac (keys %hex) {
-	#print "$hex_mac -> $hex{$hex_mac}\n";
-}
+my @port;
+my $i;
 my $g = GraphViz->new();
+my $oid;
+foreach my $ip (@hosts) {
+	my ($ses, $err) = Net::SNMP->session(
+		-hostname	=>	$ip,
+		-version	=>	"2",
+		-community	=>	"public"
+	);
+	%res = %{$ses->get_table(".1.3.6.1.2.1.17.7.1.2.2.1.2")};
+#	%res = uniq %res; #убирает только ключи, маки остаются,но криво - используются как ключи
 
-#$g->add_node("Switch13");
-#foreach my $hex_mac (sort {$hex{$a} <=> $hex{$b}} keys %hex) {
-#	$g->add_node("$hex_mac");
-#	$g->add_edge("$hex_mac" => "Switch13", label => "$hex{$hex_mac}");
+	my %hash;
+		foreach my $mac (values %res) { #порты с кол-вом повторений
+			$hash{$mac} ++;
+	}
+
+	my @ports;
+	$i = 0;
+	foreach my $port (keys %hash) { #порты, число повторений которых > 1
+	#	print $repeat;
+		if ($hash{$port} > 1) {
+			$ports[$i] = $port;
+			#print $hash{$repeat};
+		}
+	}
+
+#foreach (@ports) {print "$_\n";}
+
+	foreach my $mac (keys %res) {#удаление повторяющихся портов из хэша
+		foreach (@ports) {
+			if ($res{$mac} == $_) {
+				delete $res{$mac};
+			}
+		}
+	}
+
+	my $c;
+	my %hex_mac;
+	foreach (keys(%res)) {
+	#print "$_ -> $res->{$_}\n";
+		$_ =~ /(.1.3.6.1.2.1.17.7.1.2.2.1.2.1.)(.*)/;
+		@mac = split(/\./, $2);
+		$c = 0;
+		foreach my $i (@mac) {
+			$mac[$c] = sprintf ("%x", $i);# "$i\n";
+			$c++;
+		}
+		$hex_mac{join("-",@mac)} = $res{$_};
+	}
+
+	if ($ip eq "192.168.11.13") {
+		$oid = ".1.3.6.1.2.1.3.1.1.2.22.1";
+	}
+	else {$oid = ".1.3.6.1.2.1.3.1.1.2.30.1";}
+	
+	%res = %{$ses->get_table($oid)};
+	print Dumper \%res;
+	foreach (keys(%res)) {
+		$_ =~ /(.1.3.6.1.2.1.3.1.1.2.22.1)(.*)/;
+		print $_, "\n";
+	}
+
+	$g->add_node("$ip");
+	foreach my $mac (sort {$hex_mac{$a} <=> $hex_mac{$b}} keys %hex_mac) {#сортировка портов
+		$g->add_node("$mac");
+		$g->add_edge("$mac" => "$ip", label => "$hex_mac{$mac}");
 #	print "$hex{$hex_mac}\n";
-#}
+	}
 
-$g->add_node("Switch16");
-foreach my $hex_mac (sort {$hex1{$a} <=> $hex1{$b}} keys %hex1) {
-	$g->add_node("$hex_mac");
-	$g->add_edge("$hex_mac" => "Switch16", label => "$hex1{$hex_mac}");
-	print "$hex1{$hex_mac}\n";
+#	foreach my $hex_mac (keys %res) {print "$hex_mac -> $res{$hex_mac}\n";}
+#print Dumper \%res;
+
+
+#	print "\n";
+
 }
 
+#print $g->as_png;
+#выдаются 22 и 7 порты 13 комм в выдаче у 16 комм
+#у 13 30 порт 16 и ещё хз какой 
 
-print $g->as_png;
