@@ -14,20 +14,20 @@ my $zabbix = Zabbix::Tiny->new(
     user     => $username
 );
 
-my $hosts = $zabbix->do(
-    'host.get',  # First argument is the Zabbix API method
-    output    => [qw(hostid name host)],  # Remaining parameters to 'do' are the params for the zabbix method.
-    monitored => 1,
-    limit     => 2,
-    ## Any other params desired
-);
+my    %params = (
+#	    'output' => 'extend'
+	    'name' => 'topology'
+	    );
+
+my $hosts = $zabbix->do('map.getobjects',%params);#ид по имени
 
 print Dumper \$hosts;
-
+print $hosts->[0]{sysmapid};
 # Print some of the retrieved information.
+=pod 
 my $hostid;
 for my $host (@$hosts) {
     if ($host->{name} eq "orange pi") {$hostid = $host->{hostid};}
 #print "Host ID: $host->{hostid} - Display Name: $host->{name}\n";
 }
-
+=cut
