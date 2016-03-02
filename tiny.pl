@@ -82,7 +82,6 @@ my $hostid;
 my @arr_hash;
 for my $host (@$hosts) { #hostid по имени
     if ($host->{name} eq "orange pi") {$hostid = $host->{hostid};}
-
 }
 
 
@@ -92,12 +91,29 @@ my %params = (
 	'height' => '600',
 	'selements' => [
 		{
-		'elementid' => $hostid,
-		'selementid' => '1',
-		'elementtype' => '0',
-		'iconid_off' => '2'
+			'elementid' => '10106',
+			'selementid' => '1',
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => '100',
+			'y' => '100'
+		},
+		{
+			'elementid' => '10109',
+			'selementid' => '2',
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => '200',
+			'y' => '200'
+
 		}
-			]
+	],
+	'links' => [
+		{
+		'selementid1' => '1',
+		'selementid2' => '2'
+		}
+	]
 	);
 my $res = $zabbix->do('map.create',%params);
 print Dumper \$res;
