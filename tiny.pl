@@ -95,23 +95,62 @@ my %params = (
 			'selementid' => '1',
 			'elementtype' => '0',
 			'iconid_off' => '2',
-			'x' => '100',
-			'y' => '100'
+			'x' => '50',
+			'y' => '150'
 		},
 		{
-			'elementid' => '10109',
+			'elementid' => '10107',
 			'selementid' => '2',
 			'elementtype' => '0',
 			'iconid_off' => '2',
 			'x' => '200',
-			'y' => '200'
+			'y' => '150'
+
+		},
+		{
+			'elementid' => '10108',
+			'selementid' => '3',
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => '400',
+			'y' => '150'
+
+		},
+		{
+			'elementid' => '10109',
+			'selementid' => '4',
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => '100',
+			'y' => '100'
+
+		},
+		{
+			'elementid' => '10110',
+			'selementid' => '5',
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => '400',
+			'y' => '100'
 
 		}
 	],
 	'links' => [
 		{
 		'selementid1' => '1',
-		'selementid2' => '2'
+		'selementid2' => '4',
+		},
+		{
+		'selementid1' => '4',
+		'selementid2' => '2',
+		},
+		{
+		'selementid1' => '5',
+		'selementid2' => '3',
+		},
+		{
+		'selementid1' => '4',
+		'selementid2' => '5',
 		}
 	]
 	);
