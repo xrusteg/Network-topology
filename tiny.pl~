@@ -24,7 +24,7 @@ my $zabbix = Zabbix::Tiny->new(
 my @mapid;
 $mapid[0] = $zabbix->do('map.getobjects', name => 'topology') -> [0]{'sysmapid'};
 my $qmapid = $zabbix->do('map.delete', \@mapid);
-#print Dumper \$qmapid;
+print Dumper \$qmapid;
 
 
 my $hosts = $zabbix->do(

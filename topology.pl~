@@ -212,8 +212,5 @@ foreach my $node (keys(%ip_port)) {
 	}
 }
 
-my @nodes;
-my @links;
-
 }
 
