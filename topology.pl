@@ -31,10 +31,6 @@ my $zabbix = Zabbix::Tiny->new(
     user     => $username
 );
 
-my $hosts = $zabbix->do(
-    'host.get',
-    output    => [qw(hostid name host)],
-);
 
 my @groups = ("Routers", "Switches", "Nodes"); #создаем группы, если их нет
 foreach my $group (@groups) {
@@ -108,13 +104,70 @@ foreach (keys(%res)) { #снятие с роутера ип->мак
 }
 #print Dumper \%ip_mac;
 
+my $selementid = 1;
+my $x = 640;
+my $y = 50;
+my @nodes;
+my @links;
+
+push (@nodes, {		
+		'elementid' => '10112',
+		'selementid' => $selementid,
+		'elementtype' => '0',
+		'iconid_off' => '2',
+		'x' => $x,
+		'y' => $y
+	}
+);
+$x = 426;
+$y += 50;
+$selementid++;
+push (@nodes, {		
+		'elementid' => '10113',
+		'selementid' => $selementid,
+		'elementtype' => '0',
+		'iconid_off' => '2',
+		'x' => $x,
+		'y' => $y
+	}
+);
+
+	push (@links, {
+		'selementid1' => '1',
+		'selementid2' => $selementid,
+		}
+	);
+$x += 426;
+#$y += 50;
+$selementid++;
+push (@nodes, {		
+		'elementid' => '10114',
+		'selementid' => $selementid,
+		'elementtype' => '0',
+		'iconid_off' => '2',
+		'x' => $x,
+		'y' => $y
+	}
+);
+	push (@links, {
+		'selementid1' => '2',
+		'selementid2' => $selementid,
+		}
+	);
+	
+my $sel_id;
+
+
+$selementid = 4;
+$x = 50;
+$y = 300;
 foreach my $ip (@switches) {
 
 	my $smech;
 	my %ips;
 
-	if ($ip eq "192.168.11.13") {$oid = ".1.3.6.1.2.1.3.1.1.2.22.1"; $smech = 26};
-	if ($ip eq "192.168.11.16") {$oid = ".1.3.6.1.2.1.4.22.1.2.30"; $smech = 25};
+	if ($ip eq "192.168.11.13") {$oid = ".1.3.6.1.2.1.3.1.1.2.22.1"; $smech = 26;$sel_id = 2;};
+	if ($ip eq "192.168.11.16") {$oid = ".1.3.6.1.2.1.4.22.1.2.30"; $smech = 25;$sel_id = 3;$x+=200;};
 
 	%res = opros($ip,$oid);
 
@@ -182,7 +235,7 @@ foreach my $ip (@switches) {
 		}
 	}
 
-#print Dumper \%ip_port;
+print Dumper \%ip_port;
 
 my $groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Nodes")},}) -> [0]{'groupid'}; #если ид группы двузначный, не добавляет в данную группу
 foreach my $node (keys(%ip_port)) {
@@ -208,12 +261,41 @@ foreach my $node (keys(%ip_port)) {
 				'host_router'	=>	$ip},
 		}
 	);
-	print Dumper \$res;
+#	print Dumper \$res;
 	}
 }
 
-my @nodes;
-my @links;
-
+my	$res = $zabbix->do('host.get', groupids => '6', output => 'hostid', selectInventory => ['host_router'], searchInventory => {'host_router' => $ip});
+	foreach (@$res) {
+		push (@nodes, {		
+			'elementid' => $_->{'inventory'}{'hostid'},
+			'selementid' => $selementid,
+			'elementtype' => '0',
+			'iconid_off' => '2',
+			'x' => $x,
+			'y' => $y
+			}
+		);
+		push (@links, {
+			'selementid1' => $sel_id,
+			'selementid2' => $selementid,
+			}
+		);
+		$x += 80;
+		$selementid++;
+	}
 }
 
+
+my @mapid;
+$mapid[0] = $zabbix->do('map.getobjects', name => 'topology') -> [0]{'sysmapid'};
+my $qmapid = $zabbix->do('map.delete', \@mapid);
+
+my %params = (
+	'name' => 'topology',
+	'width' => '1280',
+	'height' => '600',
+	'selements' => \@nodes,
+	'links' => \@links
+	);
+my $res = $zabbix->do('map.create',%params);
