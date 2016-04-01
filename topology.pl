@@ -3,11 +3,7 @@ use strict;
 use Net::SNMP qw(snmp_dispatcher oid_lex_sort);
 use Data::Dumper qw(Dumper);
 use GraphViz;
-use List::MoreUtils qw/uniq/;
-use JSON::RPC::Client;
-use JSON;
 use Zabbix::Tiny;
-use Data::Dumper;
 
 sub opros {
 	my ($ip, $oid) = @_;
@@ -24,6 +20,19 @@ sub opros {
 my $username = 'Admin';
 my $password = 'zabbix';
 my $url = 'http://127.0.0.1/zabbix/api_jsonrpc.php';
+my @switches = ("192.168.11.13", "192.168.11.16");
+my $router = "192.168.11.11";
+my $groupid;
+my $exists;
+my %ip_mac;
+my $oid;
+my %res;
+my @nodes;
+my @links;
+my $selementid;
+my $x;
+my $y;
+my $sel_id;
 
 my $zabbix = Zabbix::Tiny->new(
     server   => $url,
@@ -31,23 +40,23 @@ my $zabbix = Zabbix::Tiny->new(
     user     => $username
 );
 
-
-my @groups = ("Routers", "Switches", "Nodes"); #создаем группы, если их нет
+############################
+#создаем группы, если их нет
+############################
+my @groups = ("Routers", "Switches", "Nodes");
 foreach my $group (@groups) {
 	my $exists = $zabbix->do('hostgroup.exists', name => $group);
-#print 'true' if $exists;
 	if (!$exists) {
 		my $res = $zabbix->do('hostgroup.create', name => $group);
-		print Dumper \$res;
 	}
 }
 
-my @switches = ("192.168.11.13", "192.168.11.16");
-my $router = "192.168.11.11";
 
-my $groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Routers")},}) -> [0]{'groupid'};
-
-my $exists = $zabbix->do('host.exists', host => $router);
+############################################
+#создаем и добавляем в группу Routers роутер
+############################################
+$groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Routers")},}) -> [0]{'groupid'};
+$exists = $zabbix->do('host.exists', host => $router);
 if (!$exists) {
 my	$res = $zabbix->do('host.create', 
 	{
@@ -67,8 +76,11 @@ my	$res = $zabbix->do('host.create',
 #	print Dumper \$res;
 }
 
-$groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Switches")},}) -> [0]{'groupid'};
 
+#####################################################
+#создаем и добавляем в группу Switches маршрутизаторы
+#####################################################
+$groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Switches")},}) -> [0]{'groupid'};
 foreach my $switch (@switches) {
 	my $exists = $zabbix->do('host.exists', host => $switch);
 	if (!$exists) {
@@ -91,11 +103,12 @@ foreach my $switch (@switches) {
 	}
 }
 
-my $oid = ".1.3.6.1.2.1.4.22.1.2.2";
-my %res = opros($router,$oid);
-my %ip_mac;
-
-foreach (keys(%res)) { #снятие с роутера ип->мак
+################################
+#Получение хэша ип:мак с роутера
+################################
+$oid = ".1.3.6.1.2.1.4.22.1.2.2";
+%res = opros($router,$oid);
+foreach (keys(%res)) {
 	my $ip = substr($_, 24);
 	my $mac = substr($res{$_}, 2);
 	my @macs = ($mac =~ m/.{2}/g );
@@ -104,11 +117,13 @@ foreach (keys(%res)) { #снятие с роутера ип->мак
 }
 #print Dumper \%ip_mac;
 
-my $selementid = 1;
-my $x = 640;
-my $y = 50;
-my @nodes;
-my @links;
+
+#####################################################
+#Отображение роутера и коммутаторов на карте заббикса
+#####################################################
+$selementid = 1;
+$x = 640;
+$y = 50;
 
 push (@nodes, {		
 		'elementid' => '10112',
@@ -138,7 +153,6 @@ push (@nodes, {
 		}
 	);
 $x += 426;
-#$y += 50;
 $selementid++;
 push (@nodes, {		
 		'elementid' => '10114',
@@ -149,15 +163,15 @@ push (@nodes, {
 		'y' => $y
 	}
 );
-	push (@links, {
+push (@links, {
 		'selementid1' => '2',
 		'selementid2' => $selementid,
 		}
-	);
-	
-my $sel_id;
+);
 
-
+#####################################################################
+#Опрос маршрутизаторов, добавление узлов в заббикс и построение карты
+#####################################################################
 $selementid = 4;
 $x = 50;
 $y = 300;
@@ -235,37 +249,37 @@ foreach my $ip (@switches) {
 		}
 	}
 
-print Dumper \%ip_port;
+#print Dumper \%ip_port;
 
-my $groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Nodes")},}) -> [0]{'groupid'}; #если ид группы двузначный, не добавляет в данную группу
-foreach my $node (keys(%ip_port)) {
+	my $groupid = $zabbix->do('hostgroup.get', {filter => {'name'	=>	("Nodes")},}) -> [0]{'groupid'}; #если ид группы двузначный, не добавляет в данную группу
+	foreach my $node (keys(%ip_port)) {
 #	print "$ip\t$ip_port{$node}\n";
-	my $exists = $zabbix->do('host.exists', host => $node);
-	if (!$exists) {
+		my $exists = $zabbix->do('host.exists', host => $node);
+		if (!$exists) {
 #		print $node;
-		my	$res = $zabbix->do('host.create', 
-		{
-			host => $node,
-			interfaces => {
-				'type'	=>	'1',
-				'main'	=>	'1',
-				'useip'	=>	'1',
-				'ip'	=>	$node,
-				'dns'	=>	'',
-				'port'	=>	'10050'
-			},
-			groups	=>	{'groupid'	=>	$groupid},
-			templates	=>	{'templateid'	=>	'10104'},
-			inventory_mod => '0',
-			inventory	=>	{'hardware'	=>	$ip_port{$node},
-				'host_router'	=>	$ip},
-		}
-	);
+			my	$res = $zabbix->do('host.create', 
+			{
+				host => $node,
+				interfaces => {
+					'type'	=>	'1',
+					'main'	=>	'1',
+					'useip'	=>	'1',
+					'ip'	=>	$node,
+					'dns'	=>	'',
+					'port'	=>	'10050'
+				},
+				groups	=>	{'groupid'	=>	$groupid},
+				templates	=>	{'templateid'	=>	'10104'},
+				inventory_mod => '0',
+				inventory	=>	{'hardware'	=>	$ip_port{$node},
+					'host_router'	=>	$ip},
+			}
+		);
 #	print Dumper \$res;
 	}
 }
 
-my	$res = $zabbix->do('host.get', groupids => '6', output => 'hostid', selectInventory => ['host_router'], searchInventory => {'host_router' => $ip});
+	my	$res = $zabbix->do('host.get', groupids => '6', output => 'hostid', selectInventory => ['host_router'], searchInventory => {'host_router' => $ip});
 	foreach (@$res) {
 		push (@nodes, {		
 			'elementid' => $_->{'inventory'}{'hostid'},
